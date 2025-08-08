@@ -1,0 +1,9 @@
+I am learning Japanese vocabulary with example sentences.
+The sentence I provide may contain errors or words from a misheard transcript.
+Please correct the sentence without adding new words — only replace incorrect words with correct ones that sound similar.
+Then, extract the corrected vocabulary word and corrected sentence.
+
+Word: [corrected vocabulary word]  
+Sentence: [the fully corrected, natural Japanese sentence using the corrected word]
+
+Here is the sentence to correct:

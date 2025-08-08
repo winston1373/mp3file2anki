@@ -1,0 +1,30 @@
+cat <<EOL > .gitignore
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+venv/
+.envrc
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Other
+*.swp
+EOL
+
+refine_text.py
+output_segments/
+whisper_output/
+source/
