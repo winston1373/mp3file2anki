@@ -3,30 +3,42 @@ import os
 import sys
 from pydub import AudioSegment
 from datetime import datetime
-import subprocess
+import librosa
+import soundfile as sf
+import pyrubberband as pyrb
+import random
+
 def parse_srt_timestamp(ts):
     """Convert SRT timestamp to milliseconds."""
     dt = datetime.strptime(ts, "%H:%M:%S,%f")
     return (dt.hour * 3600 + dt.minute * 60 + dt.second) * 1000 + int(dt.microsecond / 1000)
-def change_speed(sound, speed=1.0):
-    # Change playback speed
-    sound_with_altered_frame_rate = sound._spawn(
-        sound.raw_data,
-        overrides={"frame_rate": int(sound.frame_rate * speed)}
-    )
-    return sound_with_altered_frame_rate.set_frame_rate(sound.frame_rate)
-def slow_keep_pitch(input_path, output_path, factor=0.5):
+
+def slow_keep_pitch(audio_array, speed_factor):
     """
-    Slow audio without changing pitch using ffmpeg's atempo filter.
-    ffmpeg atempo supports only 0.5–2.0 in one step, so 0.5x works fine directly.
+    Slow down or speed up audio without changing pitch.
+    Returns the processed audio array.
     """
-    subprocess.run([
-        "ffmpeg", "-y", "-i", input_path,
-        "-filter:a", f"atempo={factor}",
-        output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-def extract_audio_segments(srt_path, mp3_path, output_dir):
-    # Load audio file
+    return librosa.effects.time_stretch(audio_array, rate=speed_factor)
+
+def change_pitch(audio_array, sample_rate, n_steps):
+    """
+    Change pitch of audio without changing speed.
+    Returns the processed audio array.
+    """
+    return pyrb.pitch_shift(audio_array, sample_rate, n_steps)
+
+
+def extract_audio_segments(srt_path, mp3_path, output_dir,
+                           slow_factor=0.6, pitch_shift_steps=0):
+    """
+    Extract audio segments from MP3 + SRT.
+    Saves normal, slow (pitch preserved), and optional pitch-shifted versions.
+    
+    Parameters:
+        slow_factor (float): Speed factor for slow version (<1 slows down).
+        pitch_shift_steps (list[float]): Semitone shifts for pitch versions (e.g., [2, -2]).
+    """
+    # Load audio file for slicing
     audio = AudioSegment.from_mp3(mp3_path)
 
     # Read SRT file
@@ -47,25 +59,31 @@ def extract_audio_segments(srt_path, mp3_path, output_dir):
         start_ms = parse_srt_timestamp(start_str)
         end_ms = parse_srt_timestamp(end_str)
 
-        # Clean subtitle text (remove newlines, leading/trailing spaces)
         subtitle_text = text.strip().replace('\n', ' ')
 
-        # Extract and save audio segment
+        # Extract original segment and save
         segment = audio[start_ms:end_ms]
         audio_path = os.path.join(output_dir, f"part_{int(idx):03d}.mp3")
         segment.export(audio_path, format="mp3")
+
+        # Load into librosa for processing
+        y, sr = librosa.load(audio_path, sr=None)
+
+        shifted_audio = change_pitch(y, sr, pitch_shift_steps)
+        sf.write(os.path.join(output_dir, f"part_{int(idx):03d}_pitch.mp3"),
+                    shifted_audio, sr)
         
-        # Save slow-speed audio (0.5× speed, pitch preserved)
-        slow_audio_path = os.path.join(output_dir, f"part_{int(idx):03d}_slow.mp3")
-        slow_keep_pitch(audio_path, slow_audio_path, 0.65)
-        # Save subtitle to text file
-        subtitle_path = os.path.join(output_dir, f"part_{int(idx):03d}.txt")
-        with open(subtitle_path, 'w', encoding='utf-8') as sub_file:
+        slow_audio = slow_keep_pitch(shifted_audio, slow_factor)
+        sf.write(os.path.join(output_dir, f"part_{int(idx):03d}_slow.mp3"), slow_audio, sr)
+
+
+        # Save subtitle text
+        with open(os.path.join(output_dir, f"part_{int(idx):03d}.txt"),
+                  'w', encoding='utf-8') as sub_file:
             sub_file.write(subtitle_text)
 
-        print(f"Saved: {audio_path} and {slow_audio_path} ({start_str} --> {end_str})")
+        print(f"Saved: {audio_path}, slow version, and pitch shifts for segment {idx}")
         print(f"Subtitle: {subtitle_text}")
-
 
 def main():
     if len(sys.argv) < 2:
@@ -76,7 +94,8 @@ def main():
     extract_audio_segments(
         f"whisper_output/{mp3file}_merged.srt",
         f"source/{mp3file}.mp3",
-        f"output_segments/{mp3file}"
+        f"output_segments/{mp3file}", 
+        pitch_shift_steps= random.uniform(-2, 2)
     )
 
 if __name__ == "__main__":
