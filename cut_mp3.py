@@ -29,7 +29,7 @@ def change_pitch(audio_array, sample_rate, n_steps):
 
 
 def extract_audio_segments(srt_path, mp3_path, output_dir,
-                           slow_factor=0.6, pitch_shift_steps=0):
+                           slow_factor=0.5, pitch_shift_steps=0):
     """
     Extract audio segments from MP3 + SRT.
     Saves normal, slow (pitch preserved), and optional pitch-shifted versions.
