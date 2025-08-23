@@ -28,3 +28,4 @@ refine_text.py
 output_segments/
 whisper_output/
 source/
+audio_chunks/
